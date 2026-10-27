@@ -143,13 +143,19 @@ actor TranscriptionCoordinator {
     private func preparedEngine() async throws -> TranscriptionEngine {
         if let engine { return engine }
         let configured = Config.transcriptionEngine()
-        if configured != "parakeet" {
+        let engine: TranscriptionEngine
+        switch configured {
+        case "parakeet":
+            engine = ParakeetEngine()
+        case "nb-whisper":
+            engine = NBWhisperEngine()
+        default:
             FileHandle.standardError.write(
                 Data(
-                    "warning: unknown transcription engine \"\(configured)\" — using parakeet\n".utf8
+                    "warning: unknown transcription engine \"\(configured)\" — using nb-whisper\n".utf8
                 ))
+            engine = NBWhisperEngine()
         }
-        let engine = ParakeetEngine()
         try await engine.prepare()
         self.engine = engine
         return engine

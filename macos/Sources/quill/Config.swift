@@ -38,10 +38,10 @@ enum Config {
         transcription()?["enabled"] as? Bool ?? true
     }
 
-    /// Configured engine name. Only "parakeet" ships today; the coordinator
-    /// warns and falls back for anything else.
+    /// Configured engine name: "nb-whisper" (PartScribe default, Norwegian)
+    /// or "parakeet" (English). Anything else warns and falls back.
     static func transcriptionEngine() -> String {
-        transcription()?["engine"] as? String ?? "parakeet"
+        transcription()?["engine"] as? String ?? "nb-whisper"
     }
 
     private static func transcription() -> [String: Any]? {
