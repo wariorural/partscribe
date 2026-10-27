@@ -1,0 +1,164 @@
+diff --git a/macos/Package.swift b/macos/Package.swift
+index 7708062..0e39813 100644
+--- a/macos/Package.swift
++++ b/macos/Package.swift
+@@ -7,6 +7,7 @@ let package = Package(
+     dependencies: [
+         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
+         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.7.0"),
++        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
+     ],
+     targets: [
+         .executableTarget(
+@@ -14,6 +15,7 @@ let package = Package(
+             dependencies: [
+                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                 .product(name: "FluidAudio", package: "FluidAudio"),
++                .product(name: "WhisperKit", package: "WhisperKit"),
+             ],
+             exclude: ["Info.plist"],
+             linkerSettings: [
+diff --git a/macos/Sources/quill/Config.swift b/macos/Sources/quill/Config.swift
+index 29a9d51..07efc5e 100644
+--- a/macos/Sources/quill/Config.swift
++++ b/macos/Sources/quill/Config.swift
+@@ -38,10 +38,10 @@ enum Config {
+         transcription()?["enabled"] as? Bool ?? true
+     }
+ 
+-    /// Configured engine name. Only "parakeet" ships today; the coordinator
+-    /// warns and falls back for anything else.
++    /// Configured engine name: "nb-whisper" (PartScribe default, Norwegian)
++    /// or "parakeet" (English). Anything else warns and falls back.
+     static func transcriptionEngine() -> String {
+-        transcription()?["engine"] as? String ?? "parakeet"
++        transcription()?["engine"] as? String ?? "nb-whisper"
+     }
+ 
+     private static func transcription() -> [String: Any]? {
+diff --git a/macos/Sources/quill/Transcription/NBWhisperEngine.swift b/macos/Sources/quill/Transcription/NBWhisperEngine.swift
+new file mode 100644
+index 0000000..1cadf0b
+--- /dev/null
++++ b/macos/Sources/quill/Transcription/NBWhisperEngine.swift
+@@ -0,0 +1,93 @@
++import AVFoundation
++import Foundation
++import WhisperKit
++
++/// NB-Whisper (Nasjonalbiblioteket) via WhisperKit's Core ML runtime.
++/// Norwegian-first: forces the "no" language token and writes bokmål.
++/// Models download once from Hugging Face into WhisperKit's cache.
++///
++/// PartScribe v1 — UNTESTED DRAFT. Check the WhisperKit API against the
++/// version you pin in Package.swift before building.
++actor NBWhisperEngine: TranscriptionEngine {
++    enum EngineError: Error, CustomStringConvertible {
++        case notPrepared
++        case unreadableAudio(URL, Error?)
++
++        var description: String {
++            switch self {
++            case .notPrepared: return "nb-whisper engine used before prepare()"
++            case .unreadableAudio(let url, let e):
++                return "unreadable or empty audio \(url.lastPathComponent)"
++                    + (e.map { ": \($0)" } ?? "")
++            }
++        }
++    }
++
++    nonisolated let name = "nb-whisper"
++    nonisolated let model: String
++    private let repo: String
++    private let language: String
++
++    private var pipe: WhisperKit?
++
++    /// Defaults to the community Core ML conversion of nb-whisper-small.
++    /// Swap `repo`/`variant` for your own conversion (e.g. nb-whisper-medium
++    /// or -large converted with argmax's whisperkittools) once you have one.
++    init(
++        repo: String = "Barrymanalow/nb-whisper-coreml",
++        variant: String = "nb-whisper-small",
++        language: String = "no"
++    ) {
++        self.repo = repo
++        self.model = variant
++        self.language = language
++    }
++
++    func prepare() async throws {
++        guard pipe == nil else { return }
++        let config = WhisperKitConfig(model: model, modelRepo: repo)
++        pipe = try await WhisperKit(config)
++    }
++
++    func transcribe(_ audio: URL) async throws -> [TranscriptSegment] {
++        guard let pipe else { throw EngineError.notPrepared }
++
++        // Same guard as ParakeetEngine: an empty CAF crashes AVFoundation
++        // with an uncatchable ObjC exception, so probe first.
++        do {
++            let probe = try AVAudioFile(forReading: audio)
++            guard probe.length > 0 else { throw EngineError.unreadableAudio(audio, nil) }
++        } catch let error as EngineError {
++            throw error
++        } catch {
++            throw EngineError.unreadableAudio(audio, error)
++        }
++
++        let options = DecodingOptions(
++            task: .transcribe,
++            language: language,
++            usePrefillPrompt: true,  // force the language token, skip detection
++            skipSpecialTokens: true,
++            withoutTimestamps: false,
++            chunkingStrategy: .vad  // long meetings: split on silence, not blind 30 s
++        )
++        let results = try await pipe.transcribe(audioPath: audio.path, decodeOptions: options)
++
++        return results
++            .flatMap(\.segments)
++            .compactMap { seg in
++                let text = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
++                guard !text.isEmpty else { return nil }
++                return TranscriptSegment(
++                    start: TimeInterval(seg.start),
++                    end: TimeInterval(seg.end),
++                    text: text
++                )
++            }
++    }
++
++    func release() async {
++        await pipe?.unloadModels()
++        pipe = nil
++    }
++}
+diff --git a/macos/Sources/quill/Transcription/TranscriptionCoordinator.swift b/macos/Sources/quill/Transcription/TranscriptionCoordinator.swift
+index 144be4f..6febb88 100644
+--- a/macos/Sources/quill/Transcription/TranscriptionCoordinator.swift
++++ b/macos/Sources/quill/Transcription/TranscriptionCoordinator.swift
+@@ -143,13 +143,19 @@ actor TranscriptionCoordinator {
+     private func preparedEngine() async throws -> TranscriptionEngine {
+         if let engine { return engine }
+         let configured = Config.transcriptionEngine()
+-        if configured != "parakeet" {
++        let engine: TranscriptionEngine
++        switch configured {
++        case "parakeet":
++            engine = ParakeetEngine()
++        case "nb-whisper":
++            engine = NBWhisperEngine()
++        default:
+             FileHandle.standardError.write(
+                 Data(
+-                    "warning: unknown transcription engine \"\(configured)\" — using parakeet\n".utf8
++                    "warning: unknown transcription engine \"\(configured)\" — using nb-whisper\n".utf8
+                 ))
++            engine = NBWhisperEngine()
+         }
+-        let engine = ParakeetEngine()
+         try await engine.prepare()
+         self.engine = engine
+         return engine

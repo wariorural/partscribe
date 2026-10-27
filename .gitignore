@@ -10,3 +10,6 @@ obj/
 
 # local planning notes
 .plan/
+
+# lokale testopptak (private)
+testlyd/

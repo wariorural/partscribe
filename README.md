@@ -35,3 +35,7 @@ Each platform is a native, independent implementation. They share the session la
 ## 4. License
 
 [MIT](LICENSE). Sibling of [parrot](https://github.com/humanitas-labs/parrot).
+
+## Basert på Quill
+
+PartScribe er PARTs fork av [Quill](https://github.com/humanitas-labs/quill) fra Humanitas Labs (MIT), med [NB-Whisper](https://huggingface.co/NbAiLab) fra Nasjonalbiblioteket som norsk motor. Lisens og opphavsrett til Quill er beholdt i [LICENSE](LICENSE).
