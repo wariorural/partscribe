@@ -40,57 +40,78 @@ Modellen
 5. **Bundle-id:** `no.part.partscribe`. Fjær-ikonet beholdes inntil videre.
 6. **Ekte testlyd:** Mario legger et norsk opptak i `testlyd/`. Når det ligger der: samme test som Nora-lyden (fase 3), rapporter WER-inntrykk og tid.
 
+## Status etter natt-økta 27.10 (kl. 19–19.35)
+
+Grønt (verifisert):
+- Bygg: `swift build -c release` grønt mot WhisperKit 1.1.1 og FluidAudio 0.15.5, uten nye advarsler fra egen kode.
+- Tester: 32/32 grønne via `scripts/test-macos-uten-xcode` (ingen XCTest uten Xcode).
+- `partscribe doctor` kjører og sjekker modellen til valgt motor (testet ok, mangler og ok igjen).
+- Nora, norsk, 94 s: 17 segmenter. Ingen `<|…|>`, monotone tidsstempler, header `engine: nb-whisper (nb-whisper-small)`. Én ordfeil (korrekturlesast → «korrektuleses»), ellers ordrett. Tall normaliseres pent: «kl. 12», «65 %», «f.eks.». Én gjentatt halvsetning ved en chunk-grense («For eksempel på biblioteket.»). Syntetisk tale er lett, så dette sier lite om ekte møter.
+- Fart, varm: 94 s lyd på ~9 s (12 s med oppstart) ≈ **6 min per time lyd**. Kald første kjøring med ny bundle-id: +~3 min.
+- Oversettelsesfellen, Samantha på engelsk gjennom nb-whisper: flytende norsk og upålitelig («who owns the launch» → «hvem eier lunsjen?», «Friday at noon» falt bort).
+- Parakeet på samme engelske fil: ordrett, 1 s transkripsjon (+~60 s nedlasting første gang). Modellen ligger nå i cachen.
+- `Config.setTranscriptionEngine` testet i en egen harness: bytter motor, beholder andre nøkler og skriver gyldig JSON.
+
+Venter på Mario:
+- **Fork/push:** auto-modus stoppet `gh repo fork` fordi det oppretter et offentlig repo. Repoet er klonet fra upstream (`upstream` = humanitas-labs/quill) med 5 lokale commits. Ingen `origin`, ingenting er pushet. For å fullføre: `gh repo fork humanitas-labs/quill --fork-name partscribe --clone=false`, så `git remote add origin git@github.com:wariorural/partscribe.git && git push -u origin master`. Vurder om forken skal være privat (en GitHub-fork av et offentlig repo kan ikke gjøres privat; alternativet er et nytt privat repo).
+- **Menyen er ikke sett med øynene.** Den bygger og kjører, men jeg har ikke klikket den. Sjekk at haken flytter seg mellom Norsk og Engelsk, og at `~/.config/partscribe/config.json` oppdateres.
+- `sudo ./scripts/install-macos`, deretter et kort ekte testopptak (TCC-tillatelser).
+- `testlyd/` var tom. Ikke testet med ekte opptak.
+
+Uløst:
+- Én kald kjøring (første gang med bundle-id `com.digimata.quill`) ga **0 segmenter** uten feil. Prøvde å gjenskape det med kald kjøring på `no.part.partscribe`, men den ga alle 17. Årsaken er ukjent. Et tomt transkript markeres som ferdig og prøves ikke på nytt.
+
 ## Plan — natt 27.→28.10
 
 ### Fase 1 — Fork og klon
-- [ ] `gh repo fork humanitas-labs/quill --fork-name partscribe --clone=false` (konto wariorural)
-- [ ] Klon inn i `Code/partscribe/` (mappa har bare handover + patch; flytt dem til `docs/`)
-- [ ] README: behold MIT, legg til «Basert på Quill (humanitas-labs), MIT»-avsnitt
+- [ ] `gh repo fork humanitas-labs/quill --fork-name partscribe --clone=false` (konto wariorural) — **blokkert** (offentlig repo krever Mario)
+- [x] Klon inn i `Code/partscribe/` (mappa har bare handover + patch; flytt dem til `docs/`)
+- [x] README: behold MIT, legg til «Basert på Quill (humanitas-labs), MIT»-avsnitt
 - Verifisering: `git remote -v` viser fork som origin og upstream
 
 ### Fase 2 — Patch og kompiler (handover oppg. 1)
-- [ ] `git apply partscribe-v1.patch`
-- [ ] Rett `from: "0.9.0"` → `from: "1.1.1"` i `macos/Package.swift`
-- [ ] `swift build -c release` i `macos/` — første gang henter WhisperKit + avhengigheter (tar tid)
-- [ ] Rett kompileringsfeil. Forventet: strict-concurrency-advarsler rundt `WhisperKit`-klassen (ikke Sendable) inni actoren — bør gå siden den aldri krysser isolasjonsgrensen.
-- [ ] Legg inn filter mot `<|...|>`-tokens i `NBWhisperEngine.transcribe` (regex, kun hvis `skipSpecialTokens` ikke tar alt — sjekk output først, ikke legg til blindt)
-- [ ] `swift test` grønn (eksisterende tester rører ikke motoren)
+- [x] `git apply partscribe-v1.patch`
+- [x] Rett `from: "0.9.0"` → `from: "1.1.1"` i `macos/Package.swift`
+- [x] `swift build -c release` i `macos/` — første gang henter WhisperKit + avhengigheter (tar tid)
+- [x] Rett kompileringsfeil. Forventet: strict-concurrency-advarsler rundt `WhisperKit`-klassen (ikke Sendable) inni actoren — bør gå siden den aldri krysser isolasjonsgrensen. — ingen
+- [x] Legg inn filter mot `<|...|>`-tokens i `NBWhisperEngine.transcribe` (regex, kun hvis `skipSpecialTokens` ikke tar alt — sjekk output først, ikke legg til blindt) — trengtes ikke, ingen tokens i output
+- [x] `swift test` grønn (eksisterende tester rører ikke motoren) — via scripts/test-macos-uten-xcode
 - Verifisering: `.build/release/quill doctor` kjører og rapporterer
 
 ### Fase 3 — Røyktest med syntetisk norsk lyd (erstatning for oppg. 2 til Mario kan ta opp)
-- [ ] `say -v Nora -o mic.aiff "<2–3 min norsk tekst>"` → konverter til CAF (`afconvert -f caff -d aac`)
-- [ ] Lag `~/Recordings/test-nora/` med `meta.json` (v1-skjema, les `SessionMeta.swift` for format) + `mic.caf`
-- [ ] Start daemon, la `resumePending()` kjøre, vent på `transcript.md`
-- [ ] Sjekk: norsk tekst ut, ingen `<|…|>`, tidsstempler monotone, ingen gjentakelser på slutten, `engine: nb-whisper (nb-whisper-small)` i header
-- [ ] Mål tid: lydlengde / transkripsjonstid → noter «sek per time lyd»
-- [ ] Samme test med engelsk `say -v Samantha` og `engine: "nb-whisper"` → dokumenter oversettelsesfellen konkret (forventet: flytende norsk)
-- [ ] Samme engelske fil med `engine: "parakeet"` → bekreft at Parakeet-veien fortsatt virker etter patch
+- [x] `say -v Nora -o mic.aiff "<2–3 min norsk tekst>"` → konverter til CAF (`afconvert -f caff -d aac`)
+- [x] Lag `~/Recordings/test-nora/` med `meta.json` (v1-skjema, les `SessionMeta.swift` for format) + `mic.caf` — brukte `--out` mot scratch i stedet for ~/Recordings
+- [x] Start daemon, la `resumePending()` kjøre, vent på `transcript.md` — første kald kjøring ga 0 segmenter, se Uløst
+- [x] Sjekk: norsk tekst ut, ingen `<|…|>`, tidsstempler monotone, ingen gjentakelser på slutten, `engine: nb-whisper (nb-whisper-small)` i header
+- [x] Mål tid: lydlengde / transkripsjonstid → noter «sek per time lyd»
+- [x] Samme test med engelsk `say -v Samantha` og `engine: "nb-whisper"` → dokumenter oversettelsesfellen konkret (forventet: flytende norsk)
+- [x] Samme engelske fil med `engine: "parakeet"` → bekreft at Parakeet-veien fortsatt virker etter patch
 
 ### Fase 4 — Norsk/engelsk-bryter (oppg. 3)
-- [ ] `Config.setTranscriptionEngine(_:)` — les JSON, sett `transcription.engine`, skriv atomisk tilbake. Behold andre nøkler urørt.
-- [ ] Menylinje: undermeny/to avkrysningsvalg «Norsk (NB-Whisper)» / «Engelsk (Parakeet)» under skilleren, hake på gjeldende. Valget gjelder neste transkripsjon (motoren releases etter hver kø, så ingen omlasting midt i jobb).
-- [ ] `Doctor.checkTranscription()`: sjekk valgt motor. For nb-whisper: finnes WhisperKit-cachen (`~/Documents/huggingface/models/Barrymanalow/nb-whisper-coreml/nb-whisper-small/` — verifiser faktisk sti i WhisperKit 1.1.1 `downloadBase`-default) ellers warn «~480 MB lastes ned ved første transkripsjon».
+- [x] `Config.setTranscriptionEngine(_:)` — les JSON, sett `transcription.engine`, skriv atomisk tilbake. Behold andre nøkler urørt.
+- [x] Menylinje: undermeny/to avkrysningsvalg «Norsk (NB-Whisper)» / «Engelsk (Parakeet)» under skilleren, hake på gjeldende. Valget gjelder neste transkripsjon (motoren releases etter hver kø, så ingen omlasting midt i jobb). — to valg direkte i menyen, ikke undermeny; ikke sett visuelt
+- [x] `Doctor.checkTranscription()`: sjekk valgt motor. For nb-whisper: finnes WhisperKit-cachen (`~/Documents/huggingface/models/Barrymanalow/nb-whisper-coreml/nb-whisper-small/` — verifiser faktisk sti i WhisperKit 1.1.1 `downloadBase`-default) ellers warn «~480 MB lastes ned ved første transkripsjon».
 - Verifisering: bytt i menyen → `cat ~/.config/<navn>/config.json` viser endringen; `doctor` viser riktig modell-status for begge
 
 ### Fase 5 — Omdøp (oppg. 4) — kun navn, ingen oppførsel
-- [ ] `Package.swift`: target/produkt `partscribe`, sectcreate-sti `Sources/partscribe/Info.plist`, testtarget `PartScribeTests`
-- [ ] `git mv macos/Sources/quill macos/Sources/partscribe`, samme for Tests
-- [ ] `Quill.swift` → `PartScribe.swift`: commandName, abstract, loggtekst, notifikasjonstitler
-- [ ] `Config.path` → `~/.config/partscribe/config.json`
-- [ ] `Install.swift`: label `no.part.partscribe`, `/usr/local/bin/partscribe`, `/tmp/partscribe.*.log`
-- [ ] `Info.plist`: bundle-id `no.part.partscribe`, navn, TCC-tekster på norsk
-- [ ] `MenuBarController`: hele menyen på norsk («Start opptak», «Stopp opptak», «Åpne opptaksmappe», «Avslutt PartScribe», statuslinjer «● tar opp · 28:11» osv.)
-- [ ] `TranscriptionCoordinator`: notifikasjonstitler
-- [ ] `scripts/build-macos`, `scripts/install-macos`: binærnavn og `PARTSCRIBE_INSTALL_DIR`
-- [ ] README/macos/README: navn + Quill-kreditering
+- [x] `Package.swift`: target/produkt `partscribe`, sectcreate-sti `Sources/partscribe/Info.plist`, testtarget `PartScribeTests`
+- [x] `git mv macos/Sources/quill macos/Sources/partscribe`, samme for Tests
+- [x] `Quill.swift` → `PartScribe.swift`: commandName, abstract, loggtekst, notifikasjonstitler
+- [x] `Config.path` → `~/.config/partscribe/config.json`
+- [x] `Install.swift`: label `no.part.partscribe`, `/usr/local/bin/partscribe`, `/tmp/partscribe.*.log`
+- [x] `Info.plist`: bundle-id `no.part.partscribe`, navn, TCC-tekster på norsk
+- [x] `MenuBarController`: hele menyen på norsk («Start opptak», «Stopp opptak», «Åpne opptaksmappe», «Avslutt PartScribe», statuslinjer «● tar opp · 28:11» osv.)
+- [x] `TranscriptionCoordinator`: notifikasjonstitler
+- [x] `scripts/build-macos`, `scripts/install-macos`: binærnavn og `PARTSCRIBE_INSTALL_DIR`
+- [x] README/macos/README: navn + Quill-kreditering
 - Verifisering: `grep -ri quill macos/ scripts/` gir bare treff i krediteringstekst; `swift build` + `swift test` grønn; `partscribe doctor` kjører
 
 ### Fase 6 — Avslutt økta
-- [ ] Commit per fase, push til fork
-- [ ] `AGENTS.md` i repoet: stack, hvor ting bor, fellene (WhisperKit-pin, oversettelsesfellen, sudo-install)
-- [ ] Oppdater denne fila med status + målte tall
-- [ ] Rapport til Mario: hva er grønt, hva venter på tillatelser/sudo, hva målte jeg
-- [ ] Hvis `testlyd/` har fått innhold: kjør fase 3 på den også
+- [ ] Commit per fase, push til fork — committet, **ikke pushet** (ingen fork)
+- [x] `AGENTS.md` i repoet: stack, hvor ting bor, fellene (WhisperKit-pin, oversettelsesfellen, sudo-install)
+- [x] Oppdater denne fila med status + målte tall
+- [x] Rapport til Mario: hva er grønt, hva venter på tillatelser/sudo, hva målte jeg
+- [ ] Hvis `testlyd/` har fått innhold: kjør fase 3 på den også — tom
 
 ## Ikke nå (v2+, fra handoveren)
 - Egen Core ML-konvertering av nb-whisper-medium/large
