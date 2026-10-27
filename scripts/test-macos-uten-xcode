@@ -1,0 +1,60 @@
+#!/bin/sh
+# Kjører macOS-testene på en maskin med bare Command Line Tools (ingen Xcode).
+# CLT mangler XCTest, men har swift-testing. Testene oversettes midlertidig til
+# swift-testing via et lite mellomlag, kjøres, og tilbakestilles med git.
+# Med Xcode installert: bruk vanlig `swift test` i macos/.
+set -eu
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(dirname -- "$script_dir")
+tests="$repo_root/macos/Tests/PartScribeTests"
+clt=/Library/Developer/CommandLineTools/Library/Developer
+
+if ! git -C "$repo_root" diff --quiet -- "$tests"; then
+    echo "ucommittede endringer i $tests — committ eller stash først" >&2
+    exit 1
+fi
+trap 'git -C "$repo_root" checkout -- "$tests"; rm -f "$tests/_XCTShim.swift"' EXIT
+
+python3 - "$tests" <<'PY'
+import glob, re, sys
+d = sys.argv[1]
+for f in glob.glob(f"{d}/*.swift"):
+    s = open(f).read()
+    s = s.replace("import XCTest", "import Testing\nimport Foundation")
+    s = re.sub(r"final class (\w+): XCTestCase \{", r"@Suite(.serialized) final class \1 {", s)
+    s = s.replace("override func setUpWithError() throws", "init() throws")
+    s = s.replace("override func tearDownWithError() throws", "deinit")
+    s = re.sub(r"(\n\s+)func test", r"\1@Test func test", s)
+    open(f, "w").write(s)
+PY
+
+cat > "$tests/_XCTShim.swift" <<'SWIFT'
+import Testing
+typealias Loc = SourceLocation
+func XCTAssertEqual<T: Equatable>(_ a: @autoclosure () throws -> T, _ b: @autoclosure () throws -> T, _ m: @autoclosure () -> String = "", sourceLocation: Loc = #_sourceLocation) {
+    #expect(throws: Never.self, sourceLocation: sourceLocation) { let x = try a(); let y = try b(); #expect(x == y, Comment(rawValue: m()), sourceLocation: sourceLocation) }
+}
+func XCTAssertTrue(_ a: @autoclosure () throws -> Bool, _ m: @autoclosure () -> String = "", sourceLocation: Loc = #_sourceLocation) {
+    #expect(throws: Never.self, sourceLocation: sourceLocation) { let x = try a(); #expect(x, Comment(rawValue: m()), sourceLocation: sourceLocation) }
+}
+func XCTAssertFalse(_ a: @autoclosure () throws -> Bool, _ m: @autoclosure () -> String = "", sourceLocation: Loc = #_sourceLocation) {
+    #expect(throws: Never.self, sourceLocation: sourceLocation) { let x = try a(); #expect(!x, Comment(rawValue: m()), sourceLocation: sourceLocation) }
+}
+func XCTAssertNil(_ a: @autoclosure () throws -> Any?, _ m: @autoclosure () -> String = "", sourceLocation: Loc = #_sourceLocation) {
+    #expect(throws: Never.self, sourceLocation: sourceLocation) { let x = try a(); #expect(x == nil, Comment(rawValue: m()), sourceLocation: sourceLocation) }
+}
+func XCTAssertNotNil(_ a: @autoclosure () throws -> Any?, _ m: @autoclosure () -> String = "", sourceLocation: Loc = #_sourceLocation) {
+    #expect(throws: Never.self, sourceLocation: sourceLocation) { let x = try a(); #expect(x != nil, Comment(rawValue: m()), sourceLocation: sourceLocation) }
+}
+func XCTAssertThrowsError<T>(_ a: @autoclosure () throws -> T, sourceLocation: Loc = #_sourceLocation) {
+    #expect(throws: (any Error).self, sourceLocation: sourceLocation) { _ = try a() }
+}
+SWIFT
+
+cd "$repo_root/macos"
+swift test \
+    -Xswiftc -F -Xswiftc "$clt/Frameworks" \
+    -Xlinker -F -Xlinker "$clt/Frameworks" \
+    -Xlinker -rpath -Xlinker "$clt/Frameworks" \
+    -Xlinker -rpath -Xlinker "$clt/usr/lib" "$@"

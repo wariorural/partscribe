@@ -40,8 +40,8 @@ final class SystemAudioRecorder: TrackRecorder, @unchecked Sendable {
 
     let kind = TrackKind.system
 
-    private let control = DispatchQueue(label: "com.digimata.quill.system-control")
-    private let ioQueue = DispatchQueue(label: "com.digimata.quill.system-tap")
+    private let control = DispatchQueue(label: "no.part.partscribe.system-control")
+    private let ioQueue = DispatchQueue(label: "no.part.partscribe.system-tap")
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var procID: AudioDeviceIOProcID?
@@ -61,7 +61,7 @@ final class SystemAudioRecorder: TrackRecorder, @unchecked Sendable {
             guard tapID == kAudioObjectUnknown else { throw RecorderError.alreadyRecording }
 
             let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
-            description.name = "quill system tap"
+            description.name = "partscribe system tap"
             description.isPrivate = true
             description.muteBehavior = .unmuted
 
@@ -195,7 +195,7 @@ final class SystemAudioRecorder: TrackRecorder, @unchecked Sendable {
 
     private func createAggregateDevice(tapUUID: UUID) throws {
         let desc: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "quill-tap",
+            kAudioAggregateDeviceNameKey: "partscribe-tap",
             kAudioAggregateDeviceUIDKey: UUID().uuidString,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,

@@ -1,41 +1,35 @@
-<p align="center"><img src="docs/icon.png" width="96" alt="quill"></p>
+<p align="center"><img src="docs/icon.png" width="96" alt="PartScribe"></p>
 
-# quill
+# PartScribe
 
-A fully local meeting recorder and transcriber. Quill records your mic and the call's audio as separate tracks, transcribes them on-device, and writes a timestamped `me` / `them` transcript. Nothing leaves the machine.
+PARTs lokale møteopptaker og transkriberer for Mac, som forstår norsk. Tar opp mikrofonen din og lyden fra samtalen som to spor, transkriberer dem på maskinen med [NB-Whisper](https://huggingface.co/NbAiLab), og skriver et tidsstemplet `me` / `them`-transkript. Ingenting forlater maskinen.
 
-## 1. Install
+## 1. Installer
 
 ```sh
 ./scripts/build-macos
 sudo ./scripts/install-macos
-quill install --launch-at-login   # optional
+partscribe install --launch-at-login   # valgfritt
 ```
 
-Requires macOS 15+. Apple Silicon is recommended for transcription speed.
+Krever macOS 15+ og Apple Silicon.
 
-## 2. Usage
+## 2. Bruk
 
-1. Click the feather in the menu bar and choose **Start recording**. First use asks for microphone and system audio permissions.
-2. Choose **Stop recording** when the meeting ends. Transcription starts automatically.
-3. The transcript lands in `~/Recordings/<yyyy.MM.dd-HHmm>/transcript.md`, next to the audio.
+Velg **Norsk (NB-Whisper)** eller **Engelsk (Parakeet)** i menyen før møtet. NB-Whisper på engelsk lyd gir flytende norsk oversettelse, ikke engelsk tekst.
 
-See the [macOS documentation](macos/README.md) for configuration, the CLI, and troubleshooting.
+1. Klikk fjæra i menylinja og velg **Start opptak**. Første gang spør macOS om tilgang til mikrofon og systemlyd.
+2. Velg **Stopp opptak** når møtet er ferdig. Transkriberingen starter av seg selv.
+3. Transkriptet havner i `~/Recordings/<yyyy.MM.dd-HHmm>/transcript.md`, ved siden av lyden.
 
-## 3. Platforms
+Oppsett, CLI og feilsøking står i [macOS-dokumentasjonen](macos/README.md) (engelsk, arvet fra Quill).
 
-| Platform | Status | Documentation |
-|---|---|---|
-| macOS 15+ | Working | [macOS](macos/README.md) |
-| Windows 11 | Capture probe planned | [Windows](windows/README.md) |
-| Linux | Capture probe proposed | [Linux](linux/README.md) |
+## 3. Plattformer
 
-Each platform is a native, independent implementation. They share the session layout, transcript format, and test fixtures, not source code. See [docs/architecture.md](docs/architecture.md).
+Bare macOS. `windows/` og `linux/` er arvet fra Quill og brukes ikke.
 
-## 4. License
+## 4. Lisens
 
-[MIT](LICENSE). Sibling of [parrot](https://github.com/humanitas-labs/parrot).
-
-## Basert på Quill
+[MIT](LICENSE).
 
 PartScribe er PARTs fork av [Quill](https://github.com/humanitas-labs/quill) fra Humanitas Labs (MIT), med [NB-Whisper](https://huggingface.co/NbAiLab) fra Nasjonalbiblioteket som norsk motor. Lisens og opphavsrett til Quill er beholdt i [LICENSE](LICENSE).

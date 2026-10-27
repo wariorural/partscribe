@@ -3,9 +3,9 @@ import ArgumentParser
 import Foundation
 
 @main
-struct Quill: ParsableCommand {
+struct PartScribe: ParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "quill",
+        commandName: "partscribe",
         abstract: "Local meeting recorder + transcriber. Records mic and system audio as two tracks, then transcribes on-device.",
         subcommands: [Run.self, Doctor.self, Install.self],
         defaultSubcommand: Run.self
@@ -55,7 +55,7 @@ struct Run: ParsableCommand {
 
         FileHandle.standardError.write(
             Data(
-                "quill up · recordings → \(root.path) · ^C to quit\n".utf8
+                "partscribe up · recordings → \(root.path) · ^C to quit\n".utf8
             ))
         app.run()
     }
@@ -130,8 +130,8 @@ final class AppController {
                 // The session fires this once per degradation episode, so the
                 // user gets one notification, not one per watchdog tick.
                 notifyUser(
-                    title: "quill — \(kind.label) capture lost",
-                    body: "Recovery failed; the recording will be marked incomplete."
+                    title: "PartScribe — mistet \(Self.spoken(kind))",
+                    body: "Fikk det ikke tilbake. Opptaket blir merket som ufullstendig."
                 )
             }
             try newSession.start()
@@ -140,7 +140,7 @@ final class AppController {
             FileHandle.standardError.write(Data("● recording → \(newSession.dir.path)\n".utf8))
         } catch {
             FileHandle.standardError.write(Data("recording start failed: \(error)\n".utf8))
-            notifyUser(title: "quill — recording failed", body: "\(error)")
+            notifyUser(title: "PartScribe — opptaket startet ikke", body: "\(error)")
             return
         }
 
@@ -176,13 +176,13 @@ final class AppController {
             break
         case .recovered:
             notifyUser(
-                title: "quill — recording recovered",
-                body: "Capture was interrupted and resumed; see meta.json for the gap."
+                title: "PartScribe — opptaket ble reddet",
+                body: "Opptaket ble avbrutt og tok seg opp igjen. Hullet står i meta.json."
             )
         case .incomplete:
             notifyUser(
-                title: "quill — recording incomplete",
-                body: "Part of the session was not captured; see meta.json."
+                title: "PartScribe — opptaket er ufullstendig",
+                body: "En del av møtet ble ikke tatt opp. Se meta.json."
             )
         }
         let dir = session.dir
@@ -198,9 +198,9 @@ final class AppController {
         case .healthy:
             display = .recording(elapsed: elapsed)
         case .recovering(let kind):
-            display = .recovering(track: kind.label, elapsed: elapsed)
+            display = .recovering(track: Self.spoken(kind), elapsed: elapsed)
         case .degraded(let kind):
-            display = .degraded(track: kind.label, elapsed: elapsed)
+            display = .degraded(track: Self.spoken(kind), elapsed: elapsed)
         }
         menuBar.update(display, signalWarning: captureStatus.signalWarning)
     }
@@ -211,10 +211,10 @@ final class AppController {
             menuBar.updateTranscription(nil)
         case .transcribing(let name, let queued):
             menuBar.updateTranscription(
-                queued > 0 ? "transcribing \(name) · \(queued) queued" : "transcribing \(name)"
+                queued > 0 ? "transkriberer \(name) · \(queued) i kø" : "transkriberer \(name)"
             )
         case .failed(let name):
-            menuBar.updateTranscription("transcription failed · \(name)")
+            menuBar.updateTranscription("transkripsjonen feilet · \(name)")
         }
     }
 
@@ -227,7 +227,7 @@ final class AppController {
             try Config.setTranscriptionEngine(engine)
         } catch {
             FileHandle.standardError.write(Data("engine switch failed: \(error)\n".utf8))
-            notifyUser(title: "quill — engine switch failed", body: "\(error)")
+            notifyUser(title: "PartScribe — fikk ikke byttet språk", body: "\(error)")
         }
         // Re-read rather than trust the click, so the tick shows what the
         // next transcription will actually use.
@@ -237,6 +237,12 @@ final class AppController {
     private func openFolder() {
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         NSWorkspace.shared.open(root)
+    }
+
+    /// Track names for the Norwegian menu and notifications. `kind.label`
+    /// stays English because it also goes to the stderr log.
+    private static func spoken(_ kind: TrackKind) -> String {
+        kind == .mic ? "mikrofonen" : "systemlyden"
     }
 
     private static func format(_ interval: TimeInterval) -> String {

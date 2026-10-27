@@ -35,7 +35,7 @@ final class MenuBarController {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        stateLabel = NSMenuItem(title: "idle", action: nil, keyEquivalent: "")
+        stateLabel = NSMenuItem(title: "Klar", action: nil, keyEquivalent: "")
         stateLabel.isEnabled = false
         menu.addItem(stateLabel)
 
@@ -52,14 +52,14 @@ final class MenuBarController {
         menu.addItem(.separator())
 
         toggleItem = NSMenuItem(
-            title: "Start recording",
+            title: "Start opptak",
             action: #selector(toggleClicked),
             keyEquivalent: "r"
         )
         menu.addItem(toggleItem)
 
         let openFolder = NSMenuItem(
-            title: "Open recordings folder",
+            title: "Åpne opptaksmappe",
             action: #selector(openFolderClicked),
             keyEquivalent: "o"
         )
@@ -71,12 +71,12 @@ final class MenuBarController {
         // releases its engine after every queue drain, so nothing reloads
         // mid-job.
         norwegianItem = NSMenuItem(
-            title: "Norwegian (NB-Whisper)",
+            title: "Norsk (NB-Whisper)",
             action: #selector(norwegianClicked),
             keyEquivalent: ""
         )
         englishItem = NSMenuItem(
-            title: "English (Parakeet)",
+            title: "Engelsk (Parakeet)",
             action: #selector(englishClicked),
             keyEquivalent: ""
         )
@@ -86,7 +86,7 @@ final class MenuBarController {
         menu.addItem(.separator())
 
         let quit = NSMenuItem(
-            title: "Quit quill",
+            title: "Avslutt PartScribe",
             action: #selector(quitClicked),
             keyEquivalent: "q"
         )
@@ -116,24 +116,24 @@ final class MenuBarController {
     func update(_ display: Display, signalWarning: Bool = false) {
         switch display {
         case .idle:
-            stateLabel.title = "idle"
-            toggleItem.title = "Start recording"
+            stateLabel.title = "Klar"
+            toggleItem.title = "Start opptak"
             statusItem.button?.contentTintColor = nil
         case .recording(let elapsed):
-            stateLabel.title = "● recording · \(elapsed)"
-            toggleItem.title = "Stop recording"
+            stateLabel.title = "● tar opp · \(elapsed)"
+            toggleItem.title = "Stopp opptak"
             statusItem.button?.contentTintColor = .systemRed
         case .recovering(let track, let elapsed):
-            stateLabel.title = "◐ recovering \(track) · \(elapsed)"
-            toggleItem.title = "Stop recording"
+            stateLabel.title = "◐ henter inn igjen \(track) · \(elapsed)"
+            toggleItem.title = "Stopp opptak"
             statusItem.button?.contentTintColor = .systemOrange
         case .degraded(let track, let elapsed):
-            stateLabel.title = "⚠ \(track) capture lost · \(elapsed)"
-            toggleItem.title = "Stop recording"
+            stateLabel.title = "⚠ mistet \(track) · \(elapsed)"
+            toggleItem.title = "Stopp opptak"
             statusItem.button?.contentTintColor = .systemOrange
         }
         let warn = signalWarning && display != .idle
-        warningLabel.title = warn ? "△ system audio silent" : ""
+        warningLabel.title = warn ? "△ systemlyden er stille" : ""
         warningLabel.isHidden = !warn
     }
 

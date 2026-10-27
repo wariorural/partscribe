@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>no.part.partscribe</string>
+    <key>CFBundleName</key>
+    <string>PartScribe</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>PartScribe tar opp mikrofonen din i møter, så de kan transkriberes etterpå. Lyden forlater aldri denne Macen.</string>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>PartScribe tar opp systemlyden – den andre siden av møtet – så den kan transkriberes etterpå. Lyden forlater aldri denne Macen.</string>
+</dict>
+</plist>
