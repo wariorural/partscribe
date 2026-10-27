@@ -53,7 +53,7 @@ Grønt (verifisert):
 - `Config.setTranscriptionEngine` testet i en egen harness: bytter motor, beholder andre nøkler og skriver gyldig JSON.
 
 Venter på Mario:
-- **Fork/push:** auto-modus stoppet `gh repo fork` fordi det oppretter et offentlig repo. Repoet er klonet fra upstream (`upstream` = humanitas-labs/quill) med 5 lokale commits. Ingen `origin`, ingenting er pushet. For å fullføre: `gh repo fork humanitas-labs/quill --fork-name partscribe --clone=false`, så `git remote add origin git@github.com:wariorural/partscribe.git && git push -u origin master`. Vurder om forken skal være privat (en GitHub-fork av et offentlig repo kan ikke gjøres privat; alternativet er et nytt privat repo).
+- ~~Fork/push~~ — gjort 28.10: Mario godkjente offentlig fork. `origin` = wariorural/partscribe, `upstream` = humanitas-labs/quill.
 - **Menyen er ikke sett med øynene.** Den bygger og kjører, men jeg har ikke klikket den. Sjekk at haken flytter seg mellom Norsk og Engelsk, og at `~/.config/partscribe/config.json` oppdateres.
 - `sudo ./scripts/install-macos`, deretter et kort ekte testopptak (TCC-tillatelser).
 - `testlyd/` var tom. Ikke testet med ekte opptak.
@@ -64,7 +64,7 @@ Uløst:
 ## Plan — natt 27.→28.10
 
 ### Fase 1 — Fork og klon
-- [ ] `gh repo fork humanitas-labs/quill --fork-name partscribe --clone=false` (konto wariorural) — **blokkert** (offentlig repo krever Mario)
+- [x] `gh repo fork humanitas-labs/quill --fork-name partscribe --clone=false` (konto wariorural) — offentlig, godkjent av Mario
 - [x] Klon inn i `Code/partscribe/` (mappa har bare handover + patch; flytt dem til `docs/`)
 - [x] README: behold MIT, legg til «Basert på Quill (humanitas-labs), MIT»-avsnitt
 - Verifisering: `git remote -v` viser fork som origin og upstream
@@ -107,7 +107,7 @@ Uløst:
 - Verifisering: `grep -ri quill macos/ scripts/` gir bare treff i krediteringstekst; `swift build` + `swift test` grønn; `partscribe doctor` kjører
 
 ### Fase 6 — Avslutt økta
-- [ ] Commit per fase, push til fork — committet, **ikke pushet** (ingen fork)
+- [x] Commit per fase, push til fork
 - [x] `AGENTS.md` i repoet: stack, hvor ting bor, fellene (WhisperKit-pin, oversettelsesfellen, sudo-install)
 - [x] Oppdater denne fila med status + målte tall
 - [x] Rapport til Mario: hva er grønt, hva venter på tillatelser/sudo, hva målte jeg
