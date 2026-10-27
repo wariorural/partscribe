@@ -6,8 +6,8 @@ import WhisperKit
 /// Norwegian-first: forces the "no" language token and writes bokmål.
 /// Models download once from Hugging Face into WhisperKit's cache.
 ///
-/// PartScribe v1 — UNTESTED DRAFT. Check the WhisperKit API against the
-/// version you pin in Package.swift before building.
+/// Verified against WhisperKit 1.1.1. Output has no `<|…|>` tokens with
+/// skipSpecialTokens, so no extra filtering is applied.
 actor NBWhisperEngine: TranscriptionEngine {
     enum EngineError: Error, CustomStringConvertible {
         case notPrepared

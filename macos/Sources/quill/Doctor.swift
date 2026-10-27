@@ -86,13 +86,32 @@ enum DoctorReport {
                 remediation: nil
             )
         }
-        let cache = AsrModels.defaultCacheDirectory(for: .v2)
-        if AsrModels.modelsExist(at: cache, version: .v2) {
+        if Config.transcriptionEngine() == "parakeet" {
+            let cache = AsrModels.defaultCacheDirectory(for: .v2)
+            if AsrModels.modelsExist(at: cache, version: .v2) {
+                return Check(name: "transcription", status: .ok, remediation: nil)
+            }
+            return Check(
+                name: "transcription",
+                status: .warn("parakeet models not downloaded (~600 MB)"),
+                remediation: "downloads automatically on first transcription — record a short test session while online"
+            )
+        }
+        // WhisperKit's default download base: ~/Documents/huggingface/models/<repo>/<variant>.
+        // The weight files are the bulk of the download; checking them rather
+        // than the .mlmodelc folders avoids reporting a half-fetched model as ok.
+        let model = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(
+                "Documents/huggingface/models/Barrymanalow/nb-whisper-coreml/nb-whisper-small")
+        let weights = ["AudioEncoder", "TextDecoder"].map {
+            model.appendingPathComponent("\($0).mlmodelc/weights/weight.bin").path
+        }
+        if weights.allSatisfy(FileManager.default.fileExists(atPath:)) {
             return Check(name: "transcription", status: .ok, remediation: nil)
         }
         return Check(
             name: "transcription",
-            status: .warn("parakeet models not downloaded (~600 MB)"),
+            status: .warn("nb-whisper model not downloaded (~480 MB)"),
             remediation: "downloads automatically on first transcription — record a short test session while online"
         )
     }

@@ -91,7 +91,9 @@ final class AppController {
         menuBar.onToggle = { [weak self] in self?.toggle() }
         menuBar.onOpenFolder = { [weak self] in self?.openFolder() }
         menuBar.onQuit = { [weak self] in self?.shutdown() }
+        menuBar.onSelectEngine = { [weak self] in self?.selectEngine($0) }
         menuBar.update(.idle)
+        menuBar.updateEngine(Config.transcriptionEngine())
 
         Task { [transcription, root] in
             await transcription.setStatusHandler { status in
@@ -218,6 +220,18 @@ final class AppController {
 
     private func tick() {
         refreshMenu()
+    }
+
+    private func selectEngine(_ engine: String) {
+        do {
+            try Config.setTranscriptionEngine(engine)
+        } catch {
+            FileHandle.standardError.write(Data("engine switch failed: \(error)\n".utf8))
+            notifyUser(title: "quill — engine switch failed", body: "\(error)")
+        }
+        // Re-read rather than trust the click, so the tick shows what the
+        // next transcription will actually use.
+        menuBar.updateEngine(Config.transcriptionEngine())
     }
 
     private func openFolder() {

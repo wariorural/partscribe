@@ -21,8 +21,11 @@ final class MenuBarController {
     private let warningLabel: NSMenuItem
     private let transcriptionLabel: NSMenuItem
     private let toggleItem: NSMenuItem
+    private let norwegianItem: NSMenuItem
+    private let englishItem: NSMenuItem
 
     var onToggle: (() -> Void)?
+    var onSelectEngine: ((String) -> Void)?
     var onOpenFolder: (() -> Void)?
     var onQuit: (() -> Void)?
 
@@ -64,6 +67,24 @@ final class MenuBarController {
 
         menu.addItem(.separator())
 
+        // Engine choice applies to the next transcription: the coordinator
+        // releases its engine after every queue drain, so nothing reloads
+        // mid-job.
+        norwegianItem = NSMenuItem(
+            title: "Norwegian (NB-Whisper)",
+            action: #selector(norwegianClicked),
+            keyEquivalent: ""
+        )
+        englishItem = NSMenuItem(
+            title: "English (Parakeet)",
+            action: #selector(englishClicked),
+            keyEquivalent: ""
+        )
+        menu.addItem(norwegianItem)
+        menu.addItem(englishItem)
+
+        menu.addItem(.separator())
+
         let quit = NSMenuItem(
             title: "Quit quill",
             action: #selector(quitClicked),
@@ -71,7 +92,7 @@ final class MenuBarController {
         )
         menu.addItem(quit)
 
-        for item in [toggleItem, openFolder, quit] {
+        for item in [toggleItem, openFolder, norwegianItem, englishItem, quit] {
             item.target = self
         }
 
@@ -124,6 +145,12 @@ final class MenuBarController {
         transcriptionLabel.isHidden = text == nil
     }
 
+    /// Tick the engine that the next transcription will use.
+    func updateEngine(_ engine: String) {
+        norwegianItem.state = engine == "parakeet" ? .off : .on
+        englishItem.state = engine == "parakeet" ? .on : .off
+    }
+
     // Inlined Lucide feather SVG. Keeping it in source means the executable
     // has no separate resource bundle to install alongside it — true
     // single-binary.
@@ -148,5 +175,7 @@ final class MenuBarController {
 
     @objc private func toggleClicked() { onToggle?() }
     @objc private func openFolderClicked() { onOpenFolder?() }
+    @objc private func norwegianClicked() { onSelectEngine?("nb-whisper") }
+    @objc private func englishClicked() { onSelectEngine?("parakeet") }
     @objc private func quitClicked() { onQuit?() }
 }

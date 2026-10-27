@@ -44,6 +44,35 @@ enum Config {
         transcription()?["engine"] as? String ?? "nb-whisper"
     }
 
+    /// Persist the engine choice from the menu. Read-modify-write so every
+    /// other key in the file survives; atomic so a crash never leaves a
+    /// half-written config. Throws rather than clobbering a malformed file.
+    static func setTranscriptionEngine(_ engine: String) throws {
+        var json: [String: Any] = [:]
+        if FileManager.default.fileExists(atPath: path.path) {
+            guard let existing = load() else { throw ConfigError.malformed(path) }
+            json = existing
+        }
+        var transcription = json["transcription"] as? [String: Any] ?? [:]
+        transcription["engine"] = engine
+        json["transcription"] = transcription
+        try FileManager.default.createDirectory(
+            at: path.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let data = try JSONSerialization.data(
+            withJSONObject: json, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        try data.write(to: path, options: .atomic)
+    }
+
+    enum ConfigError: Error, CustomStringConvertible {
+        case malformed(URL)
+
+        var description: String {
+            switch self {
+            case .malformed(let url): return "\(url.path) is not valid JSON — fix it by hand first"
+            }
+        }
+    }
+
     private static func transcription() -> [String: Any]? {
         load()?["transcription"] as? [String: Any]
     }
