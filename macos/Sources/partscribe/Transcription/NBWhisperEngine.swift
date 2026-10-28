@@ -133,10 +133,13 @@ actor NBWhisperEngine: TranscriptionEngine {
         var tail: [TranscriptSegment] = []
         let spokenFrom = sample(first.words.first?.start ?? first.start)
         let spokenTo = sample(last.words.last?.end ?? last.end)
-        if spokenFrom - range.lowerBound >= minimum {
+        // Each retry must be strictly shorter than this piece. A model that
+        // stamps everything at 0 s (or at the end) would otherwise hand back
+        // the whole piece as its own "untouched end" and retry it forever.
+        if spokenFrom - range.lowerBound >= minimum, spokenFrom < range.upperBound {
             head = try await decode(samples, range.lowerBound..<spokenFrom, floor: floor, pipe: pipe, options: options)
         }
-        if range.upperBound - spokenTo >= minimum {
+        if range.upperBound - spokenTo >= minimum, spokenTo > range.lowerBound {
             tail = try await decode(samples, spokenTo..<range.upperBound, floor: floor, pipe: pipe, options: options)
         }
         return head + segments + tail

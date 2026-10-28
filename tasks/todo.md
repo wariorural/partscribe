@@ -49,7 +49,7 @@ Modellen
 Venter på Mario:
 - `sudo ./scripts/install-macos` + `launchctl kickstart -k gui/$(id -u)/no.part.partscribe`.
 - Slå på Apple Intelligence (Systeminnstillinger → Apple Intelligence og Siri). Da kan jeg teste notatet.
-- Større modell: tillat installasjon av `uv` (brew) + `whisperkittools` (GitHub/PyPI), eller kjør det selv.
+- ~~Større modell~~ — medium konvertert og testet 28.10 (se AGENTS.md). Slås på med `"transcription": { "model": "medium" }`. Large er ikke konvertert (ca. dobbelt så stor og treg som medium).
 - Vurder å skru opp inngangsvolumet (står på 50 %) i Systeminnstillinger → Lyd → Inndata.
 
 ## Status 28.10 formiddag — flytende vindu + talerskille
