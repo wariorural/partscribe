@@ -8,6 +8,8 @@ PARTs lokale møteopptaker og transkriberer for Mac. Fork av [Quill](https://git
   - `nb-whisper` (standard): `NBWhisperEngine.swift`, WhisperKit 1.1.1, modell `Barrymanalow/nb-whisper-coreml` / `nb-whisper-small` (~480 MB).
   - `parakeet`: `ParakeetEngine.swift`, FluidAudio 0.15.5, kun engelsk (~600 MB).
 - Valg av motor: `Config.transcriptionEngine()`, satt fra menyen via `Config.setTranscriptionEngine(_:)`.
+- Talerskille: `Transcription/SpeakerDiarizer.swift` (FluidAudio `OfflineDiarizerManager`, ~21 MB modeller i `~/Library/Application Support/FluidAudio/Models/speaker-diarization`). Ordene fordeles på talere i `Transcript.bySpeaker` (testet i `SpeakerLabelTests`). Slås av med `transcription.diarization: false`.
+- UI: menylinja (`UI/MenuBarController.swift`) og det flytende vinduet (`UI/FloatingPanel.swift`) viser alltid samme tilstand via `AppController.show`.
 
 ## Hvor ting bor
 - Kode: `macos/Sources/partscribe/`. Tester: `macos/Tests/PartScribeTests/`.
@@ -18,7 +20,7 @@ PARTs lokale møteopptaker og transkriberer for Mac. Fork av [Quill](https://git
 - `testlyd/` er gitignored (private opptak).
 
 ## Rør ikke
-Opptak, capture recovery, me/them-fletting og transkriptformatet er Quills og skal ikke endres. Endringer går i motoren, config, meny og navn.
+Opptak, capture recovery og transkriptformatet (feltene i transcript.json) er Quills og skal ikke endres. Unntak, avtalt med Mario 28.10: talerskillet nummererer `speaker`-feltet («them 1», «them 2») når et spor har flere talere. Ett spor med én taler skal fortsatt gi ren `me`/`them`.
 
 ## Kommandoer
 - Bygg: `./scripts/build-macos` (eller `swift build -c release` i `macos/`). Første gang tar ca. 3 min.
@@ -37,6 +39,10 @@ macos/.build/release/partscribe run --out <root>   # vent på transcript.md, så
 Bruk `--out` mot en scratch-mappe, ikke `~/Recordings`. Opptak med ekte mikrofon og systemlyd krever TCC-tillatelser som bare Mario kan klikke.
 
 ## Feller
+- **Talerskille testes dårlig med syntetisk tale.** Apples norske, svenske og danske stemmer (Nora, Alva, Sara) blir én klynge. Nora mot britiske stemmer skilles perfekt, men de britiske stemmene slås sammen med hverandre. Ekte møter er eneste gode test. Ekte opptak med én taler deles ikke.
+- **Ord på grensen mellom talere** kan havne hos feil taler når Whispers ordtidsstempler er unøyaktige. Det er sett på engelsk TTS som leser norsk og ikke testet med ekte tale. Ingen utjevning er lagt inn ennå.
+- **v2-sesjoner med flere segmentfiler per spor** (etter en capture recovery) får talerskillet per fil, så «them 1» i to filer er ikke nødvendigvis samme person.
+- **Flytende vindu i skjermdeling:** `sharingType = .none` ber macOS holde panelet utenfor skjermopptak. Det stopper `screencapture`, men ikke alle opptaksveier respekterer det. Ikke verifisert mot Teams/Meet/Zoom.
 - **WhisperKit-pin:** `from: "1.1.1"`. Patchens opprinnelige `0.9.0` låste til 0.x.
 - **Oversettelsesfellen:** NB-Whisper med tvunget norsk språktoken på engelsk lyd gir flytende norsk *oversettelse*, og den er upålitelig («launch» → «lunsjen»). Engelske møter skal gå gjennom Parakeet.
 - **Kald første kjøring:** Første transkripsjon med en ny bundle-id tar ~3 min ekstra (Core ML/ANE kompilerer modellen). Cachen ser ut til å være knyttet til bundle-id, ikke til binæren, så ombygging gjør den ikke kald igjen. Én gang ga en kald kjøring 0 segmenter uten noen feil. Det er ikke gjenskapt, og årsaken er ukjent. Et tomt transkript skrives som ferdig og prøves ikke på nytt: slett `transcript.*` i sesjonsmappa og start på nytt.

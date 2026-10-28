@@ -40,6 +40,20 @@ Modellen
 5. **Bundle-id:** `no.part.partscribe`. Fjær-ikonet beholdes inntil videre.
 6. **Ekte testlyd:** Mario legger et norsk opptak i `testlyd/`. Når det ligger der: samme test som Nora-lyden (fase 3), rapporter WER-inntrykk og tid.
 
+## Status 28.10 formiddag — flytende vindu + talerskille
+
+Gjort og verifisert:
+- Flytende vindu (oppe til høyre, kan flyttes, husker plassen) med status, start/stopp og siste transkript. Kan slås av og på i menyen. Sett på skjermbilde.
+- «Åpne siste transkript» (⌘T) i menyen.
+- Talerskille: 38/38 tester grønne. Ekte enkelttaler-opptak deles ikke. Nora skilles perfekt fra britiske TTS-stemmer, mens nordiske TTS-stemmer smelter sammen (se AGENTS.md). NB-Whisper med ordtidsstempler er like rask (12 s på 94 s lyd), og gjentakelsen ved chunk-grensen forsvant. Parakeet virker fortsatt.
+
+Venter på Mario:
+- `sudo ./scripts/install-macos` og `launchctl kickstart -k gui/$(id -u)/no.part.partscribe` for å få den nye versjonen i bruk.
+- Ekte videomøte med flere folk. Det er første ordentlige test av talerskillet og systemlyden. Se etter: blir riktig antall «them N»? Deles replikker feil på grensene?
+- Sjekk om det flytende vinduet synes for de andre når du deler skjermen.
+
+Neste kandidater: utjevning av enkeltord som havner hos feil taler (hvis det viser seg i ekte møter), navngi talere etter møtet, hurtigtast, møtenotat via on_stop.
+
 ## Status etter natt-økta 27.10 (kl. 19–19.35)
 
 Grønt (verifisert):
