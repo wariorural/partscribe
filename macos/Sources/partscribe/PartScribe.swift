@@ -7,7 +7,7 @@ struct PartScribe: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "partscribe",
         abstract: "Local meeting recorder + transcriber. Records mic and system audio as two tracks, then transcribes on-device.",
-        subcommands: [Run.self, Doctor.self, Install.self],
+        subcommands: [Run.self, Doctor.self, Install.self, Notes.self],
         defaultSubcommand: Run.self
     )
 }
@@ -72,6 +72,31 @@ struct Doctor: ParsableCommand {
         if !DoctorReport.allOK(checks) {
             throw ExitCode(1)
         }
+    }
+}
+
+struct Notes: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Write (or rewrite) notat.md for a session that already has a transcript."
+    )
+
+    @Argument(help: "Session folder, e.g. ~/Recordings/2026.10.28-0932")
+    var session: String
+
+    func run() throws {
+        let dir = URL(fileURLWithPath: (session as NSString).expandingTildeInPath, isDirectory: true)
+        // ArgumentParser's run() is synchronous here (the daemon needs the
+        // main thread), so wait for the async note-writer on a semaphore.
+        final class Outcome: @unchecked Sendable { var error: Error? }
+        let outcome = Outcome()
+        let done = DispatchSemaphore(value: 0)
+        Task {
+            do { try await MeetingNotes.write(for: dir) } catch { outcome.error = error }
+            done.signal()
+        }
+        done.wait()
+        if let error = outcome.error { throw error }
+        print(dir.appendingPathComponent("notat.md").path)
     }
 }
 

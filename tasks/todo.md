@@ -43,7 +43,7 @@ Modellen
 ## Status 28.10 kl. 11 — mistet tale, møtenotat
 
 - **Feil funnet og rettet:** NB-Whisper mistet store deler av ekte møter uten å si fra (opptaket 09.32: 47 s borte, Synnøves stemme nesten helt). Nå brukes egne korte biter, utjevning og nye forsøk; se AGENTS.md. Samme opptak går fra ~45 til ~260 ord. 44/44 tester grønne. Nora- og samtaletestene holder seg.
-- **Møtenotat** (`notat.md`, Apple Intelligence lokalt) er bygget, men **ikke testet**: Apple Intelligence er av på maskinen. `partscribe doctor` sier fra.
+- **Møtenotat** (`notat.md`, Apple Intelligence lokalt) virker; testet 28.10 kl. 12–13 på tre møter. Sammendrag og oppgaver er gode, «Beslutninger» er svak. Merket som utkast i notatet. `partscribe notes <mappe>` lager det på nytt.
 - «Åpne siste transkript» åpner i TextEdit.
 
 Venter på Mario:
