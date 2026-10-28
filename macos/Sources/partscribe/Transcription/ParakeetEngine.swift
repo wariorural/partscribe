@@ -81,7 +81,8 @@ actor ParakeetEngine: TranscriptionEngine {
                 TranscriptSegment(
                     start: first.startTime,
                     end: last.endTime,
-                    text: current.map(\.word).joined(separator: " ")
+                    text: current.map(\.word).joined(separator: " "),
+                    words: current.map { TimedWord(start: $0.startTime, end: $0.endTime, text: $0.word) }
                 ))
             current = []
         }

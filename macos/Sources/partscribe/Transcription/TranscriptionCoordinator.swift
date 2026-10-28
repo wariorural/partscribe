@@ -17,6 +17,7 @@ actor TranscriptionCoordinator {
     private var queue: [URL] = []
     private var draining = false
     private var engine: TranscriptionEngine?
+    private var diarizer: SpeakerDiarizer?
     private var lastFailure: String?
     private var statusHandler: (@Sendable (Status) -> Void)?
 
@@ -94,6 +95,8 @@ actor TranscriptionCoordinator {
         }
         await engine?.release()
         engine = nil
+        await diarizer?.release()
+        diarizer = nil
         publish(lastFailure.map { .failed(session: $0) } ?? .idle)
         draining = false
         // An enqueue that landed between the loop exiting and the release
@@ -108,6 +111,7 @@ actor TranscriptionCoordinator {
         // clock, so timing gaps around a capture recovery stay visible.
         let (inputs, captureStatus) = try SessionMeta.readInputs(from: dir)
         let engine = try await preparedEngine()
+        let diarizer = await preparedDiarizer(logTo: dir)
 
         var merged: [Transcript.Segment] = []
         for input in inputs {
@@ -126,7 +130,19 @@ actor TranscriptionCoordinator {
                 log(dir, "skipping \(input.file): \(error)")
                 continue
             }
-            merged += Transcript.shifted(segments, speaker: input.speaker, offsetMs: input.offsetMs)
+            // Speaker separation is an extra: if it fails, the track keeps
+            // its plain me/them label rather than costing the transcript.
+            var turns: [SpeakerTurn] = []
+            if let diarizer, !segments.isEmpty {
+                do {
+                    turns = try await diarizer.turns(in: audio)
+                } catch {
+                    log(dir, "speaker separation skipped for \(input.file): \(error)")
+                }
+            }
+            for (speaker, group) in Transcript.bySpeaker(segments, turns: turns, base: input.speaker) {
+                merged += Transcript.shifted(group, speaker: speaker, offsetMs: input.offsetMs)
+            }
         }
         merged.sort { $0.start_ms < $1.start_ms }
 
@@ -159,6 +175,22 @@ actor TranscriptionCoordinator {
         try await engine.prepare()
         self.engine = engine
         return engine
+    }
+
+    /// nil when speaker separation is off in config or its models can't be
+    /// loaded (e.g. first run while offline) — transcription goes on without.
+    private func preparedDiarizer(logTo dir: URL) async -> SpeakerDiarizer? {
+        guard Config.diarizationEnabled() else { return nil }
+        if let diarizer { return diarizer }
+        let diarizer = SpeakerDiarizer()
+        do {
+            try await diarizer.prepare()
+        } catch {
+            log(dir, "speaker separation unavailable: \(error)")
+            return nil
+        }
+        self.diarizer = diarizer
+        return diarizer
     }
 
     /// Fires the configured on_stop shell command with the session directory
@@ -223,6 +255,63 @@ struct Transcript: Codable {
                 text: $0.text
             )
         }
+    }
+
+    /// Group one track's segments by who said them. Each word (or the whole
+    /// segment, if the engine gave no word timings) goes to the diarized
+    /// speaker it overlaps most, nearest turn if none overlap. A segment whose
+    /// words belong to several speakers is split where the speaker changes.
+    /// One speaker keeps the plain label ("them"); several are numbered in
+    /// order of first appearance ("them 1", "them 2"). No turns, no split.
+    static func bySpeaker(
+        _ segments: [TranscriptSegment], turns: [SpeakerTurn], base: String
+    ) -> [(speaker: String, segments: [TranscriptSegment])] {
+        guard !turns.isEmpty else { return segments.isEmpty ? [] : [(base, segments)] }
+
+        func owner(_ start: TimeInterval, _ end: TimeInterval) -> String {
+            let overlap = turns.map { min($0.end, end) - max($0.start, start) }
+            if let best = overlap.indices.max(by: { overlap[$0] < overlap[$1] }), overlap[best] > 0 {
+                return turns[best].speaker
+            }
+            let mid = (start + end) / 2
+            func distance(_ t: SpeakerTurn) -> TimeInterval {
+                t.start > mid ? t.start - mid : max(0, mid - t.end)
+            }
+            return turns.min { distance($0) < distance($1) }!.speaker
+        }
+
+        var runs: [(id: String, segment: TranscriptSegment)] = []
+        for segment in segments {
+            let owners = segment.words.map { owner($0.start, $0.end) }
+            guard let first = owners.first, owners.contains(where: { $0 != first }) else {
+                // One speaker throughout: keep the engine's segment as is.
+                runs.append((owners.first ?? owner(segment.start, segment.end), segment))
+                continue
+            }
+            var start = 0
+            for i in 1...owners.count where i == owners.count || owners[i] != owners[start] {
+                let words = Array(segment.words[start..<i])
+                runs.append((
+                    owners[start],
+                    TranscriptSegment(
+                        start: words.first!.start,
+                        end: words.last!.end,
+                        text: words.map(\.text).joined(separator: " "),
+                        words: words
+                    )
+                ))
+                start = i
+            }
+        }
+
+        var order: [String] = []
+        var groups: [String: [TranscriptSegment]] = [:]
+        for (id, segment) in runs {
+            if groups[id] == nil { order.append(id) }
+            groups[id, default: []].append(segment)
+        }
+        if order.count == 1 { return [(base, segments)] }
+        return order.enumerated().map { (i, id) in ("\(base) \(i + 1)", groups[id]!) }
     }
 
     /// Write transcript.json and render transcript.md. Both writes are atomic

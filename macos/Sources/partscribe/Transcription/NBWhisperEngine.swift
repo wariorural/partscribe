@@ -69,6 +69,7 @@ actor NBWhisperEngine: TranscriptionEngine {
             usePrefillPrompt: true,  // force the language token, skip detection
             skipSpecialTokens: true,
             withoutTimestamps: false,
+            wordTimestamps: true,  // lets speaker separation split mid-segment
             chunkingStrategy: .vad  // long meetings: split on silence, not blind 30 s
         )
         let results = try await pipe.transcribe(audioPath: audio.path, decodeOptions: options)
@@ -78,10 +79,16 @@ actor NBWhisperEngine: TranscriptionEngine {
             .compactMap { seg in
                 let text = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty else { return nil }
+                let words = (seg.words ?? []).compactMap { w -> TimedWord? in
+                    let word = w.word.trimmingCharacters(in: .whitespaces)
+                    guard !word.isEmpty else { return nil }
+                    return TimedWord(start: TimeInterval(w.start), end: TimeInterval(w.end), text: word)
+                }
                 return TranscriptSegment(
                     start: TimeInterval(seg.start),
                     end: TimeInterval(seg.end),
-                    text: text
+                    text: text,
+                    words: words
                 )
             }
     }

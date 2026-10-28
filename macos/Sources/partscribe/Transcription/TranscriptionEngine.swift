@@ -6,6 +6,15 @@ struct TranscriptSegment: Sendable {
     let start: TimeInterval
     let end: TimeInterval
     let text: String
+    /// Per-word timing when the engine has it, so speaker separation can split
+    /// a segment where the speaker changes mid-sentence.
+    var words: [TimedWord] = []
+}
+
+struct TimedWord: Sendable {
+    let start: TimeInterval
+    let end: TimeInterval
+    let text: String
 }
 
 /// A speech-to-text engine partscribe can run locally. Engines are prepared lazily
