@@ -55,7 +55,8 @@ Grønt (verifisert):
 Venter på Mario:
 - ~~Fork/push~~ — gjort 28.10: Mario godkjente offentlig fork. `origin` = wariorural/partscribe, `upstream` = humanitas-labs/quill.
 - **Menyen er ikke sett med øynene.** Den bygger og kjører, men jeg har ikke klikket den. Sjekk at haken flytter seg mellom Norsk og Engelsk, og at `~/.config/partscribe/config.json` oppdateres.
-- `sudo ./scripts/install-macos`, deretter et kort ekte testopptak (TCC-tillatelser).
+- ~~Install og ekte testopptak~~ — gjort 28.10 kl. 09: installert i /usr/local/bin, LaunchAgent på, TCC godkjent. To korte opptak med mikrofon ble transkribert på 2–3 s, ordrett nok. Systemlyd («them») er ennå ikke testet med en ekte samtale.
+- Fjæra kan bli skjult bak hakket på MacBook når menylinja er full. macOS sier ikke fra.
 - `testlyd/` var tom. Ikke testet med ekte opptak.
 
 Uløst:
