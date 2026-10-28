@@ -9,6 +9,8 @@ PARTs lokale møteopptaker og transkriberer for Mac. Fork av [Quill](https://git
   - `parakeet`: `ParakeetEngine.swift`, FluidAudio 0.15.5, kun engelsk (~600 MB).
 - Valg av motor: `Config.transcriptionEngine()`, satt fra menyen via `Config.setTranscriptionEngine(_:)`.
 - Talerskille: `Transcription/SpeakerDiarizer.swift` (FluidAudio `OfflineDiarizerManager`, ~21 MB modeller i `~/Library/Application Support/FluidAudio/Models/speaker-diarization`). Ordene fordeles på talere i `Transcript.bySpeaker` (testet i `SpeakerLabelTests`). Slås av med `transcription.diarization: false`.
+- Transkripsjon (NB-Whisper): `SpeechChunks.swift` deler sporet i 8–12 s biter og jevner ut lydnivået. `NBWhisperEngine.decode` sender én bit om gangen og prøver tomme biter og tomme ender på nytt.
+- Møtenotat: `Transcription/MeetingNotes.swift` skriver `notat.md` med Apples `FoundationModels` (på maskinen). Krever at Apple Intelligence er slått på. `@Generable`-makroene krever Xcode, så modellen svarer i Markdown med faste overskrifter.
 - UI: menylinja (`UI/MenuBarController.swift`) og det flytende vinduet (`UI/FloatingPanel.swift`) viser alltid samme tilstand via `AppController.show`.
 
 ## Hvor ting bor
@@ -46,6 +48,9 @@ Bruk `--out` mot en scratch-mappe, ikke `~/Recordings`. Opptak med ekte mikrofon
 - **WhisperKit-pin:** `from: "1.1.1"`. Patchens opprinnelige `0.9.0` låste til 0.x.
 - **Oversettelsesfellen:** NB-Whisper med tvunget norsk språktoken på engelsk lyd gir flytende norsk *oversettelse*, og den er upålitelig («launch» → «lunsjen»). Engelske møter skal gå gjennom Parakeet.
 - **Kald første kjøring:** Første transkripsjon med en ny bundle-id tar ~3 min ekstra (Core ML/ANE kompilerer modellen). Cachen ser ut til å være knyttet til bundle-id, ikke til binæren, så ombygging gjør den ikke kald igjen. Én gang ga en kald kjøring 0 segmenter uten noen feil. Det er ikke gjenskapt, og årsaken er ukjent. Et tomt transkript skrives som ferdig og prøves ikke på nytt: slett `transcript.*` i sesjonsmappa og start på nytt.
-- **Gjentakelse ved chunk-grense:** VAD-oppdelingen kan gjenta et halvt utsagn der to biter møtes (sett én gang på 94 s lyd).
+- **Ikke bruk WhisperKits `chunkingStrategy: .vad` eller lang-modus.** Begge kastet hele 30-sekunders vinduer med ekte møtetale uten feil (opptak 28.10 09.32: 47 s borte med VAD, 65 s borte uten). `suppressBlank`, temperatur og `withoutTimestamps` hjalp ikke. Korte biter (8–12 s) hjalp; 15–29 s mistet fortsatt opptil halvparten. Dette er nok også forklaringen på 0-segment-kjøringen 27.10.
+- **Svake stemmer forsvinner uten utjevning.** Mikrofonsporet lå på ~−42 dBFS. Et klipp med en taler langt fra mikrofonen ga ingenting ubehandlet og nesten ordrett med 10× forsterkning. Utjevningen forsterker maks 20×, og bare 4× nær støygulvet, så romstøy ikke blir til ord.
+- **Retry-logikken kan gi små dubletter** («Hvor er» / «Onster?») der en ende transkriberes på nytt. Det er en bevisst avveining mot å miste tekst.
+- **Konvertering av større NB-Whisper (medium/large) er ikke gjort.** Det krever argmax `whisperkittools` (Python ≥ 3.10, torch, coremltools), og auto-modus stoppet installasjonen av ekstern kode. Ingen har publisert en Core ML-versjon av medium/large.
 - `<|…|>`-tokens lekker ikke med `skipSpecialTokens: true`, så det er ikke lagt inn noe filter.
 - Meny, varsler og TCC-tekster er på norsk. CLI-hjelp, `doctor` og logger er fortsatt engelske.
