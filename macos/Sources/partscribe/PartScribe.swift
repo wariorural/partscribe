@@ -81,6 +81,7 @@ struct Doctor: ParsableCommand {
 final class AppController {
     private let root: URL
     private let menuBar = MenuBarController()
+    private let panel = FloatingPanel()
     private let transcription = TranscriptionCoordinator()
     private var session: RecordingSession?
     private var captureStatus = RecordingSession.CaptureStatus.allHealthy
@@ -92,8 +93,14 @@ final class AppController {
         menuBar.onOpenFolder = { [weak self] in self?.openFolder() }
         menuBar.onQuit = { [weak self] in self?.shutdown() }
         menuBar.onSelectEngine = { [weak self] in self?.selectEngine($0) }
-        menuBar.update(.idle)
+        menuBar.onOpenLast = { [weak self] in self?.openLastTranscript() }
+        menuBar.onTogglePanel = { [weak self] in self?.togglePanel() }
+        panel.onToggle = { [weak self] in self?.toggle() }
+        panel.onOpenLast = { [weak self] in self?.openLastTranscript() }
+        show(.idle)
         menuBar.updateEngine(Config.transcriptionEngine())
+        panel.show(Config.floatingWindow())
+        menuBar.updatePanel(visible: panel.isVisible)
 
         Task { [transcription, root] in
             await transcription.setStatusHandler { status in
@@ -166,7 +173,7 @@ final class AppController {
         captureStatus = .allHealthy
         ticker?.invalidate()
         ticker = nil
-        menuBar.update(.idle)
+        show(.idle)
 
         // Warn about a gap before the later "transcript ready" notification
         // implies everything went fine. Transcription still runs — recovered
@@ -202,20 +209,27 @@ final class AppController {
         case .degraded(let kind):
             display = .degraded(track: Self.spoken(kind), elapsed: elapsed)
         }
-        menuBar.update(display, signalWarning: captureStatus.signalWarning)
+        show(display, signalWarning: captureStatus.signalWarning)
+    }
+
+    /// Menu and floating panel always show the same state.
+    private func show(_ display: MenuBarController.Display, signalWarning: Bool = false) {
+        menuBar.update(display, signalWarning: signalWarning)
+        panel.update(display, signalWarning: signalWarning)
     }
 
     private func showTranscription(_ status: TranscriptionCoordinator.Status) {
+        let text: String?
         switch status {
         case .idle:
-            menuBar.updateTranscription(nil)
+            text = nil
         case .transcribing(let name, let queued):
-            menuBar.updateTranscription(
-                queued > 0 ? "transkriberer \(name) · \(queued) i kø" : "transkriberer \(name)"
-            )
+            text = queued > 0 ? "transkriberer \(name) · \(queued) i kø" : "transkriberer \(name)"
         case .failed(let name):
-            menuBar.updateTranscription("transkripsjonen feilet · \(name)")
+            text = "transkripsjonen feilet · \(name)"
         }
+        menuBar.updateTranscription(text)
+        panel.updateTranscription(text)
     }
 
     private func tick() {
@@ -237,6 +251,32 @@ final class AppController {
     private func openFolder() {
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         NSWorkspace.shared.open(root)
+    }
+
+    /// Session folders are named by start time, so the newest transcript is
+    /// the last name in sort order that has one. Falls back to the folder.
+    private func openLastTranscript() {
+        let fm = FileManager.default
+        let latest = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil))?
+            .map { $0.appendingPathComponent("transcript.md") }
+            .filter { fm.fileExists(atPath: $0.path) }
+            .max { $0.deletingLastPathComponent().lastPathComponent < $1.deletingLastPathComponent().lastPathComponent }
+        if let latest {
+            NSWorkspace.shared.open(latest)
+        } else {
+            openFolder()
+        }
+    }
+
+    private func togglePanel() {
+        let visible = !panel.isVisible
+        panel.show(visible)
+        menuBar.updatePanel(visible: visible)
+        do {
+            try Config.setFloatingWindow(visible)
+        } catch {
+            FileHandle.standardError.write(Data("panel setting not saved: \(error)\n".utf8))
+        }
     }
 
     /// Track names for the Norwegian menu and notifications. `kind.label`

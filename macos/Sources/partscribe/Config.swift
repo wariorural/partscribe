@@ -4,8 +4,9 @@ import Foundation
 ///
 ///     {
 ///       "recordings_dir": "~/Recordings",
-///       "transcription": { "enabled": true, "engine": "parakeet" },
+///       "transcription": { "enabled": true, "engine": "nb-whisper", "diarization": true },
 ///       "mic_voice_processing": true,
+///       "floating_window": true,
 ///       "on_stop": "my-hook"
 ///     }
 ///
@@ -44,18 +45,39 @@ enum Config {
         transcription()?["engine"] as? String ?? "nb-whisper"
     }
 
-    /// Persist the engine choice from the menu. Read-modify-write so every
-    /// other key in the file survives; atomic so a crash never leaves a
-    /// half-written config. Throws rather than clobbering a malformed file.
+    /// Whether each track is split into numbered speakers ("them 1",
+    /// "them 2"). Default on.
+    static func diarizationEnabled() -> Bool {
+        transcription()?["diarization"] as? Bool ?? true
+    }
+
+    /// Whether the floating panel is shown. Default on.
+    static func floatingWindow() -> Bool {
+        load()?["floating_window"] as? Bool ?? true
+    }
+
     static func setTranscriptionEngine(_ engine: String) throws {
+        try update { json in
+            var transcription = json["transcription"] as? [String: Any] ?? [:]
+            transcription["engine"] = engine
+            json["transcription"] = transcription
+        }
+    }
+
+    static func setFloatingWindow(_ visible: Bool) throws {
+        try update { $0["floating_window"] = visible }
+    }
+
+    /// Persist a choice made in the menu. Read-modify-write so every other
+    /// key in the file survives; atomic so a crash never leaves a
+    /// half-written config. Throws rather than clobbering a malformed file.
+    private static func update(_ change: (inout [String: Any]) -> Void) throws {
         var json: [String: Any] = [:]
         if FileManager.default.fileExists(atPath: path.path) {
             guard let existing = load() else { throw ConfigError.malformed(path) }
             json = existing
         }
-        var transcription = json["transcription"] as? [String: Any] ?? [:]
-        transcription["engine"] = engine
-        json["transcription"] = transcription
+        change(&json)
         try FileManager.default.createDirectory(
             at: path.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = try JSONSerialization.data(

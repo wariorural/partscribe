@@ -23,10 +23,13 @@ final class MenuBarController {
     private let toggleItem: NSMenuItem
     private let norwegianItem: NSMenuItem
     private let englishItem: NSMenuItem
+    private let panelItem: NSMenuItem
 
     var onToggle: (() -> Void)?
     var onSelectEngine: ((String) -> Void)?
     var onOpenFolder: (() -> Void)?
+    var onOpenLast: (() -> Void)?
+    var onTogglePanel: (() -> Void)?
     var onQuit: (() -> Void)?
 
     init() {
@@ -65,6 +68,20 @@ final class MenuBarController {
         )
         menu.addItem(openFolder)
 
+        let openLast = NSMenuItem(
+            title: "Åpne siste transkript",
+            action: #selector(openLastClicked),
+            keyEquivalent: "t"
+        )
+        menu.addItem(openLast)
+
+        panelItem = NSMenuItem(
+            title: "Vis flytende vindu",
+            action: #selector(panelClicked),
+            keyEquivalent: ""
+        )
+        menu.addItem(panelItem)
+
         menu.addItem(.separator())
 
         // Engine choice applies to the next transcription: the coordinator
@@ -92,7 +109,7 @@ final class MenuBarController {
         )
         menu.addItem(quit)
 
-        for item in [toggleItem, openFolder, norwegianItem, englishItem, quit] {
+        for item in [toggleItem, openFolder, openLast, panelItem, norwegianItem, englishItem, quit] {
             item.target = self
         }
 
@@ -175,6 +192,12 @@ final class MenuBarController {
 
     @objc private func toggleClicked() { onToggle?() }
     @objc private func openFolderClicked() { onOpenFolder?() }
+    func updatePanel(visible: Bool) {
+        panelItem.state = visible ? .on : .off
+    }
+
+    @objc private func openLastClicked() { onOpenLast?() }
+    @objc private func panelClicked() { onTogglePanel?() }
     @objc private func norwegianClicked() { onSelectEngine?("nb-whisper") }
     @objc private func englishClicked() { onSelectEngine?("parakeet") }
     @objc private func quitClicked() { onQuit?() }
