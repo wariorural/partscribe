@@ -112,17 +112,28 @@ enum DoctorReport {
                 remediation: "downloads automatically on first transcription — record a short test session while online"
             )
         }
-        // WhisperKit's default download base: ~/Documents/huggingface/models/<repo>/<variant>.
-        // The weight files are the bulk of the download; checking them rather
-        // than the .mlmodelc folders avoids reporting a half-fetched model as ok.
-        let model = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(
+        // Small: WhisperKit's default download base, ~/Documents/huggingface/models/<repo>/<variant>.
+        // Medium/large: converted locally, never downloaded.
+        // The weight files are the bulk of a model; checking them rather than
+        // the .mlmodelc folders avoids reporting a half-fetched model as ok.
+        let size = Config.configuredNBWhisperSize()
+        let local = NBWhisperEngine.localFolder(size: size)
+        let model =
+            local
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(
                 "Documents/huggingface/models/Barrymanalow/nb-whisper-coreml/nb-whisper-small")
         let weights = ["AudioEncoder", "TextDecoder"].map {
             model.appendingPathComponent("\($0).mlmodelc/weights/weight.bin").path
         }
         if weights.allSatisfy(FileManager.default.fileExists(atPath:)) {
             return Check(name: "transcription", status: .ok, remediation: nil)
+        }
+        if let local {
+            return Check(
+                name: "transcription",
+                status: .warn("nb-whisper-\(size) not found in \(local.path) — using small"),
+                remediation: "run scripts/convert-nb-whisper \(size), or set transcription.model to \"small\""
+            )
         }
         return Check(
             name: "transcription",

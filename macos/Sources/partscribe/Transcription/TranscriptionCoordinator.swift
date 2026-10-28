@@ -169,7 +169,7 @@ actor TranscriptionCoordinator {
         case "parakeet":
             engine = ParakeetEngine()
         case "nb-whisper":
-            engine = NBWhisperEngine()
+            engine = NBWhisperEngine(size: Config.nbWhisperSize())
         default:
             FileHandle.standardError.write(
                 Data(

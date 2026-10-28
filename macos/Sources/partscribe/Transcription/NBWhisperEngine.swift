@@ -4,7 +4,9 @@ import WhisperKit
 
 /// NB-Whisper (Nasjonalbiblioteket) via WhisperKit's Core ML runtime.
 /// Norwegian-first: forces the "no" language token and writes bokmål.
-/// Models download once from Hugging Face into WhisperKit's cache.
+/// Small downloads once from a community conversion on Hugging Face; medium
+/// and large have no published Core ML build, so they are converted locally
+/// (scripts/convert-nb-whisper) into `localModels`.
 ///
 /// Verified against WhisperKit 1.1.1. Output has no `<|…|>` tokens with
 /// skipSpecialTokens, so no extra filtering is applied.
@@ -25,27 +27,30 @@ actor NBWhisperEngine: TranscriptionEngine {
 
     nonisolated let name = "nb-whisper"
     nonisolated let model: String
-    private let repo: String
     private let language: String
 
     private var pipe: WhisperKit?
 
-    /// Defaults to the community Core ML conversion of nb-whisper-small.
-    /// Swap `repo`/`variant` for your own conversion (e.g. nb-whisper-medium
-    /// or -large converted with argmax's whisperkittools) once you have one.
-    init(
-        repo: String = "Barrymanalow/nb-whisper-coreml",
-        variant: String = "nb-whisper-small",
-        language: String = "no"
-    ) {
-        self.repo = repo
-        self.model = variant
+    static let localModels = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Application Support/PartScribe/models", isDirectory: true)
+
+    /// Where a locally converted size lives, or nil for small (downloaded).
+    static func localFolder(size: String) -> URL? {
+        size == "small" ? nil : localModels.appendingPathComponent("nb-whisper-\(size)", isDirectory: true)
+    }
+
+    /// `size` is "small", "medium" or "large".
+    init(size: String = "small", language: String = "no") {
+        self.model = "nb-whisper-\(size)"
         self.language = language
     }
 
     func prepare() async throws {
         guard pipe == nil else { return }
-        let config = WhisperKitConfig(model: model, modelRepo: repo)
+        let size = String(model.dropFirst("nb-whisper-".count))
+        let config =
+            Self.localFolder(size: size).map { WhisperKitConfig(modelFolder: $0.path, download: false) }
+            ?? WhisperKitConfig(model: model, modelRepo: "Barrymanalow/nb-whisper-coreml")
         pipe = try await WhisperKit(config)
     }
 

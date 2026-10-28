@@ -4,7 +4,7 @@ import Foundation
 ///
 ///     {
 ///       "recordings_dir": "~/Recordings",
-///       "transcription": { "enabled": true, "engine": "nb-whisper", "diarization": true },
+///       "transcription": { "enabled": true, "engine": "nb-whisper", "model": "small", "diarization": true },
 ///       "mic_voice_processing": true,
 ///       "floating_window": true,
 ///       "meeting_notes": true,
@@ -44,6 +44,23 @@ enum Config {
     /// or "parakeet" (English). Anything else warns and falls back.
     static func transcriptionEngine() -> String {
         transcription()?["engine"] as? String ?? "nb-whisper"
+    }
+
+    /// NB-Whisper model size from config: "small" (default, downloads by
+    /// itself), "medium" or "large" (must be converted locally first).
+    static func configuredNBWhisperSize() -> String {
+        let size = transcription()?["model"] as? String ?? "small"
+        return ["small", "medium", "large"].contains(size) ? size : "small"
+    }
+
+    /// The size actually used: the configured one if it is installed,
+    /// otherwise small, so a missing conversion never stops transcription.
+    /// `doctor` reports the mismatch.
+    static func nbWhisperSize() -> String {
+        let size = configuredNBWhisperSize()
+        guard let folder = NBWhisperEngine.localFolder(size: size) else { return size }
+        let encoder = folder.appendingPathComponent("AudioEncoder.mlmodelc/weights/weight.bin")
+        return FileManager.default.fileExists(atPath: encoder.path) ? size : "small"
     }
 
     /// Whether each track is split into numbered speakers ("them 1",
