@@ -11,6 +11,7 @@ actor TranscriptionCoordinator {
     enum Status: Sendable {
         case idle
         case transcribing(session: String, queued: Int)
+        case writingNotes(session: String)
         case failed(session: String)
     }
 
@@ -82,7 +83,11 @@ actor TranscriptionCoordinator {
             publish(.transcribing(session: dir.lastPathComponent, queued: queue.count))
             do {
                 try await transcribe(dir)
-                notifyUser(title: "PartScribe — transkriptet er klart", body: dir.lastPathComponent)
+                let noted = await writeNotes(for: dir)
+                notifyUser(
+                    title: "PartScribe — transkriptet er klart",
+                    body: dir.lastPathComponent + (noted ? " · med møtenotat" : "")
+                )
                 runHook(for: dir)
             } catch {
                 log(dir, "transcription failed: \(error)")
@@ -175,6 +180,22 @@ actor TranscriptionCoordinator {
         try await engine.prepare()
         self.engine = engine
         return engine
+    }
+
+    /// Notes are an extra on top of the transcript: when they can't be made
+    /// (Apple Intelligence off, model refuses), log why and carry on. Runs
+    /// before the on_stop hook so the hook can pick up notat.md.
+    private func writeNotes(for dir: URL) async -> Bool {
+        guard Config.meetingNotesEnabled() else { return false }
+        publish(.writingNotes(session: dir.lastPathComponent))
+        do {
+            try await MeetingNotes.write(for: dir)
+            log(dir, "meeting notes written")
+            return true
+        } catch {
+            log(dir, "meeting notes skipped: \(error)")
+            return false
+        }
     }
 
     /// nil when speaker separation is off in config or its models can't be

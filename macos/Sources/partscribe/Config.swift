@@ -7,6 +7,7 @@ import Foundation
 ///       "transcription": { "enabled": true, "engine": "nb-whisper", "diarization": true },
 ///       "mic_voice_processing": true,
 ///       "floating_window": true,
+///       "meeting_notes": true,
 ///       "on_stop": "my-hook"
 ///     }
 ///
@@ -49,6 +50,12 @@ enum Config {
     /// "them 2"). Default on.
     static func diarizationEnabled() -> Bool {
         transcription()?["diarization"] as? Bool ?? true
+    }
+
+    /// Whether notat.md is written after each transcript. Default on; needs
+    /// Apple Intelligence, and is skipped quietly without it.
+    static func meetingNotesEnabled() -> Bool {
+        load()?["meeting_notes"] as? Bool ?? true
     }
 
     /// Whether the floating panel is shown. Default on.

@@ -225,6 +225,8 @@ final class AppController {
             text = nil
         case .transcribing(let name, let queued):
             text = queued > 0 ? "transkriberer \(name) · \(queued) i kø" : "transkriberer \(name)"
+        case .writingNotes(let name):
+            text = "lager møtenotat · \(name)"
         case .failed(let name):
             text = "transkripsjonen feilet · \(name)"
         }
@@ -262,7 +264,13 @@ final class AppController {
             .filter { fm.fileExists(atPath: $0.path) }
             .max { $0.deletingLastPathComponent().lastPathComponent < $1.deletingLastPathComponent().lastPathComponent }
         if let latest {
-            NSWorkspace.shared.open(latest)
+            // TextEdit rather than whatever owns .md (often Xcode), which
+            // would be a heavy, confusing place to land after a meeting.
+            NSWorkspace.shared.open(
+                [latest],
+                withApplicationAt: URL(fileURLWithPath: "/System/Applications/TextEdit.app"),
+                configuration: NSWorkspace.OpenConfiguration()
+            )
         } else {
             openFolder()
         }

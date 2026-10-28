@@ -21,7 +21,22 @@ enum DoctorReport {
             checkSystemAudio(),
             checkRecordingsRoot(recordingsRoot),
             checkTranscription(),
+            checkMeetingNotes(),
         ]
+    }
+
+    static func checkMeetingNotes() -> Check {
+        guard Config.meetingNotesEnabled() else {
+            return Check(name: "meeting notes", status: .warn("disabled in config"), remediation: nil)
+        }
+        if let why = MeetingNotes.unavailableReason() {
+            return Check(
+                name: "meeting notes",
+                status: .warn(why),
+                remediation: "System Settings → Apple Intelligence & Siri → turn on Apple Intelligence"
+            )
+        }
+        return Check(name: "meeting notes", status: .ok, remediation: nil)
     }
 
     static func checkMicrophone() -> Check {

@@ -69,28 +69,72 @@ actor NBWhisperEngine: TranscriptionEngine {
             usePrefillPrompt: true,  // force the language token, skip detection
             skipSpecialTokens: true,
             withoutTimestamps: false,
-            wordTimestamps: true,  // lets speaker separation split mid-segment
-            chunkingStrategy: .vad  // long meetings: split on silence, not blind 30 s
+            wordTimestamps: true  // lets speaker separation split mid-segment
         )
-        let results = try await pipe.transcribe(audioPath: audio.path, decodeOptions: options)
 
-        return results
-            .flatMap(\.segments)
-            .compactMap { seg in
-                let text = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !text.isEmpty else { return nil }
-                let words = (seg.words ?? []).compactMap { w -> TimedWord? in
-                    let word = w.word.trimmingCharacters(in: .whitespaces)
-                    guard !word.isEmpty else { return nil }
-                    return TimedWord(start: TimeInterval(w.start), end: TimeInterval(w.end), text: word)
-                }
-                return TranscriptSegment(
-                    start: TimeInterval(seg.start),
-                    end: TimeInterval(seg.end),
-                    text: text,
-                    words: words
+        // Our own short pieces instead of long-form decoding or WhisperKit's
+        // VAD chunker — both dropped whole windows of real meeting speech
+        // without an error. See SpeechChunks.
+        let samples = try AudioProcessor.loadAudioAsFloatArray(fromPath: audio.path)
+        let floor = SpeechChunks.noiseFloor(samples)
+        var segments: [TranscriptSegment] = []
+        for range in SpeechChunks.split(samples) {
+            segments += try await decode(samples, range, floor: floor, pipe: pipe, options: options)
+        }
+        return segments
+    }
+
+    /// Transcribe one piece. Whisper sometimes ends a window early — before
+    /// writing anything, or halfway — more often the longer the piece. An
+    /// empty answer is retried as two halves, and four seconds or more left
+    /// untouched at either end is retried on its own, until what remains is
+    /// too short to hold speech.
+    private func decode(
+        _ samples: [Float], _ range: Range<Int>, floor: Float, pipe: WhisperKit, options: DecodingOptions
+    ) async throws -> [TranscriptSegment] {
+        let offset = TimeInterval(range.lowerBound) / TimeInterval(SpeechChunks.sampleRate)
+        let results = try await pipe.transcribe(
+            audioArray: SpeechChunks.leveled(samples[range], noiseFloor: floor), decodeOptions: options)
+        let segments = results.flatMap(\.segments).compactMap { seg -> TranscriptSegment? in
+            let text = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return nil }
+            let words = (seg.words ?? []).compactMap { w -> TimedWord? in
+                let word = w.word.trimmingCharacters(in: .whitespaces)
+                guard !word.isEmpty else { return nil }
+                return TimedWord(
+                    start: offset + TimeInterval(w.start),
+                    end: offset + TimeInterval(w.end),
+                    text: word
                 )
             }
+            return TranscriptSegment(
+                start: offset + TimeInterval(seg.start),
+                end: offset + TimeInterval(seg.end),
+                text: text,
+                words: words
+            )
+        }
+        let minimum = 4 * SpeechChunks.sampleRate
+        guard let first = segments.first, let last = segments.last else {
+            guard range.count >= 2 * minimum else { return [] }
+            let middle = range.lowerBound + range.count / 2
+            return try await decode(samples, range.lowerBound..<middle, floor: floor, pipe: pipe, options: options)
+                + decode(samples, middle..<range.upperBound, floor: floor, pipe: pipe, options: options)
+        }
+        func sample(_ time: TimeInterval) -> Int {
+            min(max(Int(time * TimeInterval(SpeechChunks.sampleRate)), range.lowerBound), range.upperBound)
+        }
+        var head: [TranscriptSegment] = []
+        var tail: [TranscriptSegment] = []
+        let spokenFrom = sample(first.words.first?.start ?? first.start)
+        let spokenTo = sample(last.words.last?.end ?? last.end)
+        if spokenFrom - range.lowerBound >= minimum {
+            head = try await decode(samples, range.lowerBound..<spokenFrom, floor: floor, pipe: pipe, options: options)
+        }
+        if range.upperBound - spokenTo >= minimum {
+            tail = try await decode(samples, spokenTo..<range.upperBound, floor: floor, pipe: pipe, options: options)
+        }
+        return head + segments + tail
     }
 
     func release() async {
