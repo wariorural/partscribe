@@ -1,5 +1,7 @@
 # PartScribe — plan v1
 
+Kart: AGENTS.md · docs/architecture.md · docs/decisions/ · docs/partscribe-handover-v1.md · CHANGELOG.md
+
 Kilde: `partscribe-handover-v1.md` + `partscribe-v1.patch` (ligger i mappa til repoet er klonet, flyttes da til `docs/`).
 Mål for natt-økta 27.–28.10.2026: oppgave 1 og 3 ferdig og verifisert, oppgave 4 påbegynt. Oppgave 2 trenger Mario (mikrofon- og systemlyd-tillatelser må klikkes av et menneske).
 
